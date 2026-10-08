@@ -65,21 +65,20 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     };
   }, [isPaused, goNext, slides.length]);
 
-  if (slides.length === 0) return null;
-
-  const slide = slides[current];
-  const title = slide.title.english || slide.title.romaji;
-  const slug = slugify(title);
-  const genres = slide.genres.slice(0, 3).join(' · ');
-  const score = slide.averageScore ? (slide.averageScore / 10).toFixed(1) : '8.9';
-  const episodes = slide.episodes ? `${slide.episodes} episodes` : 'TV Series';
-  const seasonText = slide.seasonYear ? `${slide.season || 'Summer'} ${slide.seasonYear}` : '2026';
-  const description = slide.description
+  const hasSlides = slides.length > 0;
+  const slide = hasSlides ? (slides[current] || slides[0]) : null;
+  const title = slide ? (slide.title.english || slide.title.romaji) : '';
+  const slug = title ? slugify(title) : '';
+  const genres = slide ? slide.genres.slice(0, 3).join(' · ') : '';
+  const score = slide?.averageScore ? (slide.averageScore / 10).toFixed(1) : '8.9';
+  const episodes = slide?.episodes ? `${slide.episodes} episodes` : 'TV Series';
+  const seasonText = slide?.seasonYear ? `${slide.season || 'Summer'} ${slide.seasonYear}` : '2026';
+  const description = slide?.description
     ? slide.description.replace(/<[^>]*>/g, '').replace(/\n/g, ' ')
     : 'An exciting anime series awaits you.';
 
   const [tmdbMedia, setTmdbMedia] = useState<{ backdrop: string | null; poster: string | null } | null>(() => {
-    return getCachedTMDBMedia(title);
+    return title ? getCachedTMDBMedia(title) : null;
   });
 
   useEffect(() => {
@@ -94,6 +93,8 @@ export function HeroCarousel({ slides }: HeroCarouselProps) {
     loadTMDBHero();
     return () => { cancelled = true; };
   }, [title]);
+
+  if (!hasSlides || !slide) return null;
 
   const heroImage = tmdbMedia?.backdrop || tmdbMedia?.poster || slide.bannerImage || slide.coverImage.extraLarge;
 

@@ -29,23 +29,22 @@ export function DiscoverSection({
       ? topRated
       : thisSeason;
 
-  if (!currentList || currentList.length === 0) return null;
+  const hasItems = Boolean(currentList && currentList.length > 0);
+  const featured = hasItems ? (currentList[selectedIndex] || currentList[0]) : null;
+  const sideItems = hasItems ? currentList.slice(0, 4) : [];
 
-  const featured = currentList[selectedIndex] || currentList[0];
-  const sideItems = currentList.slice(0, 4);
-
-  const featuredTitle = featured.title.english || featured.title.romaji;
-  const featuredSlug = slugify(featuredTitle);
-  const featuredScore = featured.averageScore ? `${featured.averageScore}%` : '85%';
-  const featuredYear = featured.seasonYear || '2024';
-  const featuredStatus = featured.status ? featured.status.toLowerCase() : 'finished';
-  const featuredFormat = featured.format || 'TV';
-  const featuredDescription = featured.description
+  const featuredTitle = featured ? (featured.title.english || featured.title.romaji) : '';
+  const featuredSlug = featuredTitle ? slugify(featuredTitle) : '';
+  const featuredScore = featured?.averageScore ? `${featured.averageScore}%` : '85%';
+  const featuredYear = featured?.seasonYear || '2024';
+  const featuredStatus = featured?.status ? featured.status.toLowerCase() : 'finished';
+  const featuredFormat = featured?.format || 'TV';
+  const featuredDescription = featured?.description
     ? featured.description.replace(/<[^>]*>/g, '').replace(/\n/g, ' ')
     : 'An epic anime journey begins here.';
 
   const [tmdbFeatured, setTmdbFeatured] = useState<string | null>(() => {
-    return getCachedTMDBMedia(featuredTitle)?.backdrop || getCachedTMDBMedia(featuredTitle)?.poster || null;
+    return featuredTitle ? (getCachedTMDBMedia(featuredTitle)?.backdrop || getCachedTMDBMedia(featuredTitle)?.poster || null) : null;
   });
 
   React.useEffect(() => {
@@ -60,6 +59,8 @@ export function DiscoverSection({
     loadFeaturedMedia();
     return () => { cancelled = true; };
   }, [featuredTitle]);
+
+  if (!hasItems || !featured) return null;
 
   return (
     <section className="py-8 px-[4vw] max-w-[1550px] mx-auto">

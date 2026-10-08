@@ -119,7 +119,7 @@ export function UnlockCard({ variant, onClose }: Props) {
       </button>
 
       <p className="text-zinc-500 text-[13px] mt-3 text-center">
-        You'll complete a quick step to generate your key. Takes about 30 seconds.
+        You&apos;ll complete a quick step to generate your key. Takes about 30 seconds.
       </p>
 
       <div className="mt-5 text-center">
