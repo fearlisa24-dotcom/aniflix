@@ -1,6 +1,9 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const secret = new TextEncoder().encode(process.env.UNLOCK_SECRET!);
+const SECRET_STRING =
+  process.env.UNLOCK_SECRET ||
+  "aniflix_secure_jwt_secret_32_bytes_long_key_2026_pusl_v4";
+const secret = new TextEncoder().encode(SECRET_STRING);
 
 export interface SessionPayload {
   key: string;

@@ -12,8 +12,10 @@ export async function validatePandaKey(
   key: string,
   hwid: string
 ): Promise<PandaValidationResponse> {
-  const apiKey = process.env.PANDA_API_KEY;
-  if (!apiKey) throw new Error("PANDA_API_KEY not set");
+  const apiKey =
+    process.env.PANDA_API_KEY ||
+    "0fe73e45-2799-4073-8d84-5660bb6e0a8b";
+  const sid = serviceId || process.env.PANDA_SERVICE_ID || "aniflixx";
 
   const url = `${PANDA_BASE}/v2_validation`;
 
@@ -28,8 +30,8 @@ export async function validatePandaKey(
       Accept: "application/json",
     },
     body: JSON.stringify({
-      service: serviceId,
-      serviceId: serviceId,
+      service: sid,
+      serviceId: sid,
       key,
       hwid,
     }),
@@ -49,8 +51,8 @@ export async function validatePandaKey(
           Accept: "application/json",
         },
         body: JSON.stringify({
-          service: serviceId,
-          serviceId: serviceId,
+          service: sid,
+          serviceId: sid,
           key,
           hwid,
         }),
@@ -92,8 +94,11 @@ export async function validatePandaKey(
   };
 }
 
-export function getPandaGetKeyUrl(hwid: string): string {
-  const base = process.env.NEXT_PUBLIC_PANDA_GETKEY ?? "";
+export function getPandaGetKeyUrl(hwid?: string): string {
+  const base =
+    process.env.NEXT_PUBLIC_PANDA_GETKEY ||
+    "https://ads.pandauth.com/getkey/aniflixx";
+  if (!hwid) return base;
   const sep = base.includes("?") ? "&" : "?";
   return `${base}${sep}hwid=${encodeURIComponent(hwid)}`;
 }

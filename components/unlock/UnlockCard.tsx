@@ -10,7 +10,19 @@ interface Props {
 }
 
 export function UnlockCard({ variant, onClose }: Props) {
-  const [hwid, setHwid] = useState("");
+  const [hwid, setHwid] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const cached = localStorage.getItem("aniflix_hwid");
+      if (cached) return cached;
+      const gen = "af_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+      try {
+        localStorage.setItem("aniflix_hwid", gen);
+      } catch {}
+      return gen;
+    }
+    return "af_default";
+  });
+
   const [key, setKey] = useState("");
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [status, setStatus] = useState<"idle" | "validating" | "error">("idle");
@@ -18,15 +30,30 @@ export function UnlockCard({ variant, onClose }: Props) {
 
   useEffect(() => {
     async function init() {
-      const cached = localStorage.getItem("aniflix_hwid");
-      if (cached) { setHwid(cached); return; }
-      const fp = await FingerprintJS.load();
-      const result = await fp.get();
-      localStorage.setItem("aniflix_hwid", result.visitorId);
-      setHwid(result.visitorId);
+      try {
+        const cached = localStorage.getItem("aniflix_hwid");
+        if (cached) {
+          setHwid(cached);
+          return;
+        }
+        const fp = await FingerprintJS.load();
+        const result = await fp.get();
+        if (result?.visitorId) {
+          localStorage.setItem("aniflix_hwid", result.visitorId);
+          setHwid(result.visitorId);
+        }
+      } catch {
+        if (!hwid) {
+          const fallback = "af_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+          try {
+            localStorage.setItem("aniflix_hwid", fallback);
+          } catch {}
+          setHwid(fallback);
+        }
+      }
     }
     init();
-  }, []);
+  }, [hwid]);
 
   useEffect(() => {
     if (variant !== "splash") return;
@@ -66,6 +93,8 @@ export function UnlockCard({ variant, onClose }: Props) {
       setErrorMsg("Network error. Try again.");
     }
   }
+
+  const getKeyUrl = getPandaGetKeyUrl(hwid);
 
   const card = (
     <div
@@ -107,16 +136,17 @@ export function UnlockCard({ variant, onClose }: Props) {
         ))}
       </ul>
 
-      <button
+      <a
+        href={getKeyUrl}
+        target="_blank"
+        rel="noopener noreferrer"
         onClick={() => {
-          if (!hwid) return;
-          window.open(getPandaGetKeyUrl(hwid), "_blank", "noopener,noreferrer");
+          setShowKeyInput(true);
         }}
-        disabled={!hwid}
-        className="w-full bg-[#F47521] hover:bg-[#ff8a3d] disabled:opacity-50 text-black font-bold uppercase tracking-wide rounded-lg py-3.5 px-6 transition-colors text-sm"
+        className="block text-center w-full bg-[#F47521] hover:bg-[#ff8a3d] text-black font-bold uppercase tracking-wide rounded-lg py-3.5 px-6 transition-colors text-sm cursor-pointer shadow-lg hover:shadow-orange-500/20"
       >
         Get Your Key Now
-      </button>
+      </a>
 
       <p className="text-zinc-500 text-[13px] mt-3 text-center">
         You&apos;ll complete a quick step to generate your key. Takes about 30 seconds.

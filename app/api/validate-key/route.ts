@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { key, hwid } = body;
-  const serviceId = process.env.PANDA_SERVICE_ID;
+  const serviceId = process.env.PANDA_SERVICE_ID || "aniflixx";
 
   if (!key || !hwid || !serviceId) {
     return NextResponse.json(

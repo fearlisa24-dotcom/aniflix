@@ -2,32 +2,38 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { UnlockCard } from '@/components/unlock/UnlockCard';
 import { AniflixLogo } from '@/components/layout/TopNav';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
 function UnlockCallbackContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [status, setStatus] = useState<'validating' | 'success' | 'error'>('validating');
-  const [message, setMessage] = useState('Validating your access key from Work.ink...');
+  const token = searchParams.get('token') || searchParams.get('key');
+  const [status, setStatus] = useState<'idle' | 'validating' | 'success' | 'error'>(
+    token ? 'validating' : 'idle'
+  );
+  const [message, setMessage] = useState('Validating your access key...');
 
   useEffect(() => {
-    const token = searchParams.get('token') || searchParams.get('key');
+    if (!token) return;
+
     const redirectUrl = searchParams.get('redirect') || '/';
+    const hwid =
+      (typeof window !== 'undefined' ? localStorage.getItem('aniflix_hwid') : null) ||
+      'af_device_id';
 
     const processToken = async () => {
-      const activeToken = token || `workink-key-${Date.now()}`;
-
       try {
         const res = await fetch('/api/validate-key', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key: activeToken }),
+          body: JSON.stringify({ key: token.trim(), hwid }),
         });
 
-        const data = (await res.json()) as { success: boolean };
+        const data = await res.json();
 
-        if (data.success) {
+        if (data.status === 'success') {
           setStatus('success');
           setMessage('Key validated! You have 24 hours of unlimited access.');
           setTimeout(() => {
@@ -35,7 +41,7 @@ function UnlockCallbackContent() {
           }, 1000);
         } else {
           setStatus('error');
-          setMessage('Could not validate this key. Please try again.');
+          setMessage(data.message || 'Could not validate this key. Please try again.');
         }
       } catch {
         setStatus('error');
@@ -44,7 +50,16 @@ function UnlockCallbackContent() {
     };
 
     processToken();
-  }, [searchParams, router]);
+  }, [token, searchParams, router]);
+
+  // If no token in URL, render the full UnlockCard so user can get their key
+  if (!token) {
+    return (
+      <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-4">
+        <UnlockCard variant="gate" />
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex items-center justify-center p-4 bg-black/95 noise-overlay">
@@ -56,7 +71,7 @@ function UnlockCallbackContent() {
         {status === 'validating' && (
           <div className="flex flex-col items-center gap-4">
             <Loader2 className="w-10 h-10 text-[#F47521] animate-spin" />
-            <h2 className="text-xl font-semibold text-white">Generating Access</h2>
+            <h2 className="text-xl font-semibold text-white">Validating Key</h2>
             <p className="text-sm text-zinc-400">{message}</p>
           </div>
         )}

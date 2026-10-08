@@ -172,7 +172,7 @@ export function SidebarDrawer({ isOpen, onClose }: SidebarDrawerProps) {
               onClose();
               const splashBtn = document.querySelector('[data-open-unlock]');
               if (splashBtn) (splashBtn as HTMLElement).click();
-              else router.push('/unlock');
+              else router.push('/unlock-required');
             }}
             className="w-full py-3 px-4 rounded-xl bg-[#F47521] hover:bg-[#ff8a3d] text-black font-black text-sm tracking-wide flex items-center justify-center gap-2 shadow-lg shadow-orange-950/40 transition-all cursor-pointer uppercase"
           >
