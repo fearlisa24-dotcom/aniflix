@@ -94,7 +94,9 @@ export function UnlockCard({ variant, onClose }: Props) {
     }
   }
 
-  const getKeyUrl = getPandaGetKeyUrl(hwid);
+  const getKeyUrl = hwid
+    ? `https://ads.pandauth.com/getkey/aniflixx?hwid=${encodeURIComponent(hwid)}`
+    : "https://ads.pandauth.com/getkey/aniflixx";
 
   const card = (
     <div

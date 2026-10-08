@@ -95,10 +95,7 @@ export async function validatePandaKey(
 }
 
 export function getPandaGetKeyUrl(hwid?: string): string {
-  const base =
-    process.env.NEXT_PUBLIC_PANDA_GETKEY ||
-    "https://ads.pandauth.com/getkey/aniflixx";
+  const base = "https://ads.pandauth.com/getkey/aniflixx";
   if (!hwid) return base;
-  const sep = base.includes("?") ? "&" : "?";
-  return `${base}${sep}hwid=${encodeURIComponent(hwid)}`;
+  return `${base}?hwid=${encodeURIComponent(hwid)}`;
 }
