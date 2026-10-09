@@ -324,6 +324,154 @@ export async function searchAnime(search: string, perPage: number = 20): Promise
   }
 }
 
+export interface FranchiseSeason {
+  id: number;
+  seasonNumber: number;
+  title: string;
+  year?: number | null;
+}
+
+export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]> {
+  const query = `
+    query ($id: Int) {
+      Media(id: $id, type: ANIME) {
+        id
+        title { romaji english }
+        format
+        seasonYear
+        relations {
+          edges {
+            relationType
+            node {
+              id
+              format
+              seasonYear
+              title { romaji english }
+              relations {
+                edges {
+                  relationType
+                  node {
+                    id
+                    format
+                    seasonYear
+                    title { romaji english }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { id } }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      data?: {
+        Media?: {
+          id: number;
+          title: { romaji: string; english: string | null };
+          format: string;
+          seasonYear: number | null;
+          relations?: {
+            edges: Array<{
+              relationType: string;
+              node: {
+                id: number;
+                format: string;
+                seasonYear: number | null;
+                title: { romaji: string; english: string | null };
+                relations?: {
+                  edges: Array<{
+                    relationType: string;
+                    node: {
+                      id: number;
+                      format: string;
+                      seasonYear: number | null;
+                      title: { romaji: string; english: string | null };
+                    };
+                  }>;
+                };
+              };
+            }>;
+          };
+        };
+      };
+    };
+
+    const media = json.data?.Media;
+    if (!media) return [];
+
+    const map = new Map<number, { id: number; title: string; year: number | null }>();
+
+    map.set(media.id, {
+      id: media.id,
+      title: media.title.english || media.title.romaji,
+      year: media.seasonYear,
+    });
+
+    const edges = media.relations?.edges || [];
+    for (const edge of edges) {
+      if ((edge.relationType === 'PREQUEL' || edge.relationType === 'SEQUEL') && edge.node?.id) {
+        if (edge.node.format === 'TV' || edge.node.format === 'OVA' || edge.node.format === 'ONA') {
+          map.set(edge.node.id, {
+            id: edge.node.id,
+            title: edge.node.title.english || edge.node.title.romaji,
+            year: edge.node.seasonYear,
+          });
+
+          const subEdges = edge.node.relations?.edges || [];
+          for (const sub of subEdges) {
+            if ((sub.relationType === 'PREQUEL' || sub.relationType === 'SEQUEL') && sub.node?.id) {
+              if (sub.node.format === 'TV' || sub.node.format === 'OVA' || sub.node.format === 'ONA') {
+                map.set(sub.node.id, {
+                  id: sub.node.id,
+                  title: sub.node.title.english || sub.node.title.romaji,
+                  year: sub.node.seasonYear,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (map.size <= 1) {
+      return [{
+        id: media.id,
+        seasonNumber: 1,
+        title: 'Season 1',
+        year: media.seasonYear,
+      }];
+    }
+
+    const sorted = Array.from(map.values()).sort((a, b) => {
+      if (a.year && b.year && a.year !== b.year) {
+        return a.year - b.year;
+      }
+      return a.id - b.id;
+    });
+
+    return sorted.map((item, idx) => ({
+      id: item.id,
+      seasonNumber: idx + 1,
+      title: `Season ${idx + 1}`,
+      year: item.year,
+    }));
+  } catch (err) {
+    console.error("Failed to get franchise seasons:", err);
+    return [];
+  }
+}
+
 export async function getAnimeById(id: number): Promise<AnimeDetail> {
   const query = `
     query ($id: Int) {
@@ -450,11 +598,28 @@ export async function getAnimeById(id: number): Promise<AnimeDetail> {
       }
     }
   `;
-  const data = await anilistQuery<{ Media: AnimeDetail }>(query, { id });
-  return data.Media;
+  const res = await fetch("https://graphql.anilist.co", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables: { id } }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`AniList API error: ${res.status}`);
+  }
+  const json = (await res.json()) as { data: { Media: AnimeDetail } };
+  return json.data.Media;
 }
 
 export async function getAnimeBySlug(slug: string): Promise<AnimeDetail | null> {
+  const isNumeric = /^\d+$/.test(slug);
+  if (isNumeric) {
+    try {
+      return await getAnimeById(parseInt(slug, 10));
+    } catch {
+      return null;
+    }
+  }
   const searchTerm = slug.replace(/-/g, ' ');
   const searchResults = await searchAnime(searchTerm, 5);
   if (searchResults.length === 0) return null;

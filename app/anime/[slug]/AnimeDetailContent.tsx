@@ -6,14 +6,16 @@ import { Sparkles, Star } from 'lucide-react';
 import { AnimeHero } from '@/components/anime/AnimeHero';
 import { EpisodeList } from '@/components/anime/EpisodeList';
 import { RelatedRail } from '@/components/anime/RelatedRail';
+import { SeasonSelector, FranchiseSeason } from '@/components/anime/SeasonSelector';
 import type { AnimeDetail } from '@/types';
 
 interface AnimeDetailContentProps {
   anime: AnimeDetail;
   slug: string;
+  seasons?: FranchiseSeason[];
 }
 
-export function AnimeDetailContent({ anime, slug }: AnimeDetailContentProps) {
+export function AnimeDetailContent({ anime, slug, seasons }: AnimeDetailContentProps) {
   const title = anime.title.english || anime.title.romaji;
   const status = anime.status || 'Airing';
   const format = anime.format || 'TV';
@@ -36,12 +38,22 @@ export function AnimeDetailContent({ anime, slug }: AnimeDetailContentProps) {
       .map((n) => n.mediaRecommendation) || [];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white">
+    <div key={anime.id} className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Anime Hero Banner (Image 3) */}
       <AnimeHero anime={anime} slug={slug} />
 
       {/* Main Content Area */}
       <div className="max-w-[1550px] mx-auto px-[4vw] py-8">
+        {/* Franchise Season Selector */}
+        {seasons && seasons.length > 1 && (
+          <div className="mb-6 bg-[#111111] border border-white/10 rounded-2xl p-4 shadow-lg">
+            <p className="text-[11px] font-black uppercase tracking-widest text-[#F47521] mb-2">
+              SEASONS
+            </p>
+            <SeasonSelector currentId={anime.id} seasons={seasons} />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Left Column: Episodes & Related */}
           <div className="lg:col-span-8 flex flex-col gap-10">

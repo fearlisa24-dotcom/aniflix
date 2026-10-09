@@ -1,3 +1,5 @@
+export const revalidate = 0;
+
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { MegaPlayPlayer } from "@/components/player/MegaPlayPlayer";
@@ -48,7 +50,7 @@ export default async function WatchPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] pt-18 sm:pt-20 px-3 sm:px-[4vw] pb-16">
+    <main key={anilistId} className="min-h-screen bg-[#0a0a0a] pt-18 sm:pt-20 px-3 sm:px-[4vw] pb-16">
       <div className="max-w-[1550px] mx-auto">
         {/* Top Breadcrumb matching Image 1 */}
         <nav className="flex items-center gap-2 text-xs sm:text-sm text-zinc-400 mb-4 overflow-hidden text-ellipsis whitespace-nowrap">
@@ -78,6 +80,7 @@ export default async function WatchPage({
           <div className="lg:col-span-8 flex flex-col">
             {/* Player */}
             <MegaPlayPlayer
+              key={anilistId}
               anilistId={anilistId}
               episode={episode}
               title={`${animeName} — ${episodeTitle}`}
