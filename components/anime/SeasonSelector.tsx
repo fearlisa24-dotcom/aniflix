@@ -2,13 +2,9 @@
 
 import React from 'react';
 import { useRouter } from 'next/navigation';
+import type { FranchiseSeason } from '@/lib/anilist';
 
-export interface FranchiseSeason {
-  id: number;
-  seasonNumber: number;
-  title: string;
-  year?: number | null;
-}
+export type { FranchiseSeason };
 
 interface SeasonSelectorProps {
   currentId: number;

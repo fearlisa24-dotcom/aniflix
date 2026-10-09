@@ -13,6 +13,8 @@ interface Props {
   initialLanguage?: Language;
   malId?: number;
   initialTime?: number;
+  prevHref?: string | null;
+  nextHref?: string | null;
 }
 
 export function MegaPlayPlayer({
@@ -23,6 +25,8 @@ export function MegaPlayPlayer({
   initialLanguage = "sub",
   malId,
   initialTime,
+  prevHref,
+  nextHref,
 }: Props) {
   const [lang, setLang] = useState<Language>(() => {
     if (typeof window !== "undefined") {
@@ -106,8 +110,17 @@ export function MegaPlayPlayer({
   }, [anilistId, episode]);
 
   const embedUrl = getServerEmbed('edge', anilistId, episode, lang, malId, resumeTime);
-  const hasPrev = episode > 1;
-  const hasNext = totalEpisodes ? episode < totalEpisodes : true;
+
+  const canGoPrev = Boolean(prevHref) || episode > 1;
+  const canGoNext = Boolean(nextHref) || (totalEpisodes ? episode < totalEpisodes : true);
+
+  const resolvedPrev = prevHref
+    ? `${prevHref.replace(/\?lang=[^&]*/, '')}?lang=${lang}`
+    : `/watch/${anilistId}/${episode - 1}?lang=${lang}`;
+
+  const resolvedNext = nextHref
+    ? `${nextHref.replace(/\?lang=[^&]*/, '')}?lang=${lang}`
+    : `/watch/${anilistId}/${episode + 1}?lang=${lang}`;
 
   return (
     <div className="w-full max-w-[1200px] mx-auto">
@@ -133,10 +146,10 @@ export function MegaPlayPlayer({
         {/* Prev / Next navigation */}
         <div className="flex gap-2">
           <Link
-            href={hasPrev ? `/watch/${anilistId}/${episode - 1}?lang=${lang}` : "#"}
+            href={canGoPrev ? resolvedPrev : "#"}
             prefetch={true}
             className={`px-4 py-1.5 rounded-md text-sm font-semibold border-2 transition-colors ${
-              hasPrev
+              canGoPrev
                 ? "border-[#F47521]/40 text-[#F47521] hover:bg-[#F47521]/10"
                 : "border-white/10 text-zinc-700 cursor-not-allowed pointer-events-none"
             }`}
@@ -144,10 +157,10 @@ export function MegaPlayPlayer({
             ‹ Prev
           </Link>
           <Link
-            href={hasNext ? `/watch/${anilistId}/${episode + 1}?lang=${lang}` : "#"}
+            href={canGoNext ? resolvedNext : "#"}
             prefetch={true}
             className={`px-4 py-1.5 rounded-md text-sm font-semibold border-2 transition-colors ${
-              hasNext
+              canGoNext
                 ? "border-[#F47521]/40 text-[#F47521] hover:bg-[#F47521]/10"
                 : "border-white/10 text-zinc-700 cursor-not-allowed pointer-events-none"
             }`}

@@ -5,7 +5,14 @@ import { ChevronRight, Home } from "lucide-react";
 import { MegaPlayPlayer } from "@/components/player/MegaPlayPlayer";
 import { WatchEpisodeSidebar } from "@/components/watch/WatchEpisodeSidebar";
 import { WatchDetailsSection } from "@/components/watch/WatchDetailsSection";
-import { getAnimeById, getAnimeBySlug } from "@/lib/anilist";
+import {
+  getAnimeById,
+  getAnimeBySlug,
+  getFranchiseSeasons,
+  getNextEpisodeHref,
+  getPrevEpisodeHref,
+  type FranchiseSeason,
+} from "@/lib/anilist";
 import type { AnimeDetail } from "@/types";
 
 export default async function WatchPage({
@@ -25,6 +32,7 @@ export default async function WatchPage({
   let animeName = `Anime #${params.id}`;
   let episodeTitle = `Episode ${episode}`;
   let totalEpisodes = 24;
+  let franchiseSeasons: FranchiseSeason[] = [];
 
   try {
     anime = isNumeric
@@ -44,10 +52,15 @@ export default async function WatchPage({
       // Fast non-blocking episode title determination
       const streaming = anime.streamingEpisodes?.[episode - 1];
       episodeTitle = streaming?.title || `Episode ${episode}`;
+
+      franchiseSeasons = await getFranchiseSeasons(anilistId);
     }
   } catch {
     // fallback
   }
+
+  const prevHref = getPrevEpisodeHref(anilistId, episode, franchiseSeasons, initialLanguage);
+  const nextHref = getNextEpisodeHref(anilistId, episode, totalEpisodes, franchiseSeasons, initialLanguage);
 
   return (
     <main key={anilistId} className="min-h-screen bg-[#0a0a0a] pt-18 sm:pt-20 px-3 sm:px-[4vw] pb-16">
@@ -88,6 +101,8 @@ export default async function WatchPage({
               initialTime={initialTime}
               initialLanguage={initialLanguage}
               malId={anime?.idMal || undefined}
+              prevHref={prevHref}
+              nextHref={nextHref}
             />
 
             {/* Anime Info & Comments Section (Image 2) */}
@@ -107,6 +122,7 @@ export default async function WatchPage({
               totalEpisodes={totalEpisodes}
               anime={anime}
               coverImage={anime?.coverImage?.large}
+              seasons={franchiseSeasons}
             />
           </div>
         </div>

@@ -3,18 +3,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Play, Search, ArrowUpDown, ChevronDown } from 'lucide-react';
+import { Play, Search, ArrowUpDown } from 'lucide-react';
 import { getAnimeAllEpisodesProgress, EpisodeWatchStatus } from '@/lib/progress';
 import type { Episode } from '@/types';
-
-interface SeasonInfo {
-  seasonNumber: number;
-  name: string;
-  episodeCount: number;
-  startEpisode: number;
-  endEpisode: number;
-  posterPath: string | null;
-}
 
 interface EpisodeListProps {
   slug: string;
@@ -43,22 +34,17 @@ export function EpisodeList({
   bannerImage,
 }: EpisodeListProps) {
   const isOnePiece = /one\s*piece/i.test(animeTitle || slug);
-  const initialTotal = isOnePiece ? 1180 : (totalEpisodes && totalEpisodes > 0 ? totalEpisodes : 24);
+  const totalCount = isOnePiece ? 1180 : (totalEpisodes && totalEpisodes > 0 ? totalEpisodes : 12);
 
-  const [totalCount, setTotalCount] = useState<number>(initialTotal);
-  const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
-  const [activeSeason, setActiveSeason] = useState<number>(0);
   const [activeRange, setActiveRange] = useState<number>(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortAsc, setSortAsc] = useState(true);
   const [activeSubTab, setActiveSubTab] = useState<'episodes' | 'characters' | 'staff'>('episodes');
-  const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
 
   const [tmdbEpisodes, setTmdbEpisodes] = useState<
     Array<{ number: number; title: string; thumbnail: string | null; airDate: string }>
   >([]);
   const [isLoadingRange, setIsLoadingRange] = useState(false);
-  const [isLoadingSeasons, setIsLoadingSeasons] = useState(true);
 
   // Watch history tracking for dots and highlight
   const [watchProgressMap, setWatchProgressMap] = useState<Record<number, { time: number; duration: number; completed: boolean }>>({});
@@ -82,63 +68,29 @@ export function EpisodeList({
     }
   }, [lookupKey]);
 
-  // Fetch season list
-  useEffect(() => {
-    let cancelled = false;
-    async function loadSeasons() {
-      setIsLoadingSeasons(true);
-      try {
-        const res = await fetch(
-          `/api/episodes?title=${encodeURIComponent(resolvedTitle)}&count=${totalCount}&mode=seasons`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled && data.seasons && data.seasons.length > 0) {
-            setSeasons(data.seasons);
-            if (data.totalCount && data.totalCount > totalCount) {
-              setTotalCount(data.totalCount);
-            }
-          }
-        }
-      } catch {
-        // fallback
-      } finally {
-        if (!cancelled) setIsLoadingSeasons(false);
-      }
-    }
-    loadSeasons();
-    return () => { cancelled = true; };
-  }, [resolvedTitle, totalCount]);
-
-  const currentSeason = seasons[activeSeason] || null;
-  const seasonEpCount = currentSeason?.episodeCount || totalCount;
-  const seasonStart = currentSeason?.startEpisode || 1;
-  const seasonEnd = currentSeason?.endEpisode || totalCount;
-
   // Sub-ranges if season has more than 24 episodes
-  const numSubRanges = Math.ceil(seasonEpCount / PAGE_SIZE);
+  const numSubRanges = Math.ceil(totalCount / PAGE_SIZE);
+  const rangeStart = activeRange * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((activeRange + 1) * PAGE_SIZE, totalCount);
 
-  // Fetch episodes for current active range within active season
+  // Reset range when switching anime/season
+  useEffect(() => {
+    setActiveRange(0);
+  }, [animeId, totalEpisodes]);
+
+  // Fetch episodes metadata for current active range
   useEffect(() => {
     let cancelled = false;
     async function loadTMDBRange() {
       setIsLoadingRange(true);
-      const rangeStart = seasonStart + activeRange * PAGE_SIZE;
-      const rangeEnd = Math.min(seasonStart + (activeRange + 1) * PAGE_SIZE - 1, seasonEnd);
-
       try {
         const res = await fetch(
           `/api/episodes?title=${encodeURIComponent(resolvedTitle)}&rangeStart=${rangeStart}&rangeEnd=${rangeEnd}&count=${totalCount}`
         );
         if (res.ok) {
           const data = await res.json();
-          if (!cancelled) {
-            if (data.totalCount && data.totalCount > totalCount) {
-              setTotalCount(data.totalCount);
-            }
-            if (data.episodes) {
-              setTmdbEpisodes(data.episodes);
-            }
+          if (!cancelled && data.episodes) {
+            setTmdbEpisodes(data.episodes);
           }
         }
       } catch {
@@ -148,16 +100,9 @@ export function EpisodeList({
       }
     }
 
-    if (seasons.length > 0 || !isLoadingSeasons) {
-      loadTMDBRange();
-    }
+    loadTMDBRange();
     return () => { cancelled = true; };
-  }, [resolvedTitle, activeSeason, activeRange, totalCount, seasons, seasonStart, seasonEnd, isLoadingSeasons]);
-
-  // Reset range when switching seasons
-  useEffect(() => {
-    setActiveRange(0);
-  }, [activeSeason]);
+  }, [resolvedTitle, rangeStart, rangeEnd, totalCount]);
 
   // Compute status for an episode
   const getEpStatus = (num: number): EpisodeWatchStatus => {
@@ -174,8 +119,6 @@ export function EpisodeList({
 
   // Build displayed episodes
   const displayedEpisodes = useMemo(() => {
-    const rangeStart = seasonStart + activeRange * PAGE_SIZE;
-    const rangeEnd = Math.min(seasonStart + (activeRange + 1) * PAGE_SIZE - 1, seasonEnd);
     const fallbackBanner = bannerImage || coverImage;
 
     const list: Array<Episode & { status: EpisodeWatchStatus }> = [];
@@ -214,7 +157,7 @@ export function EpisodeList({
     }
 
     return sortAsc ? filtered : [...filtered].reverse();
-  }, [activeSeason, activeRange, seasonStart, seasonEnd, totalCount, tmdbEpisodes, streamingEpisodes, bannerImage, coverImage, searchQuery, sortAsc, watchProgressMap]);
+  }, [rangeStart, rangeEnd, tmdbEpisodes, streamingEpisodes, bannerImage, coverImage, searchQuery, sortAsc, watchProgressMap]);
 
   return (
     <div className="w-full">
@@ -282,7 +225,7 @@ export function EpisodeList({
                 {totalCount} available episodes
               </h3>
               <p className="text-xs text-zinc-400 mt-0.5">
-                {currentSeason ? `${currentSeason.name} — ${currentSeason.episodeCount} episodes` : 'Pick up anywhere in the season.'}
+                Episodes 1 through {totalCount}
               </p>
             </div>
 
@@ -310,59 +253,12 @@ export function EpisodeList({
             </div>
           </div>
 
-          {/* Season Selector Dropdown */}
-          {seasons.length > 1 && (
-            <div className="relative mb-4">
-              <button
-                type="button"
-                onClick={() => setSeasonDropdownOpen(!seasonDropdownOpen)}
-                className="flex items-center gap-2.5 bg-[#141414] border border-white/10 hover:border-[#F47521]/60 rounded-xl px-4 py-2.5 text-sm font-bold text-white transition-all cursor-pointer w-full sm:w-auto shadow-md"
-              >
-                <span className="bg-[#F47521]/15 text-[#F47521] text-[11px] font-black px-2 py-0.5 rounded uppercase tracking-wider border border-[#F47521]/30">
-                  S{currentSeason?.seasonNumber || 1}
-                </span>
-                <span className="truncate max-w-[280px] sm:max-w-md">{currentSeason?.name || 'Season 1'}</span>
-                <span className="text-xs text-zinc-500 ml-auto sm:ml-2">({currentSeason?.episodeCount || 0} eps)</span>
-                <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${seasonDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {seasonDropdownOpen && (
-                <div className="absolute top-full mt-1.5 left-0 right-0 sm:right-auto sm:min-w-[420px] bg-[#161616] border border-white/10 rounded-xl shadow-2xl z-50 max-h-[380px] overflow-y-auto scrollbar-hide py-1 backdrop-blur-xl">
-                  {seasons.map((season, idx) => (
-                    <button
-                      key={season.seasonNumber}
-                      type="button"
-                      onClick={() => {
-                        setActiveSeason(idx);
-                        setSeasonDropdownOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/5 cursor-pointer ${
-                        activeSeason === idx ? 'bg-[#F47521]/10 border-l-3 border-l-[#F47521]' : 'border-l-3 border-l-transparent'
-                      }`}
-                    >
-                      <span className={`text-[11px] font-black uppercase tracking-wider w-8 ${
-                        activeSeason === idx ? 'text-[#F47521]' : 'text-zinc-500'
-                      }`}>S{season.seasonNumber}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold truncate ${
-                          activeSeason === idx ? 'text-white' : 'text-zinc-300'
-                        }`}>{season.name}</p>
-                        <p className="text-[11px] text-zinc-500">Episodes {season.startEpisode}–{season.endEpisode}</p>
-                      </div>
-                      <span className="text-xs text-zinc-500 shrink-0">{season.episodeCount} eps</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sub-Range Tabs (within a season, if season has > 24 episodes) */}
+          {/* Sub-Range Tabs (if season has > 24 episodes) */}
           {numSubRanges > 1 && (
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-3 mb-5 border-b border-white/5">
               {Array.from({ length: numSubRanges }).map((_, idx) => {
-                const start = seasonStart + idx * PAGE_SIZE;
-                const end = Math.min(seasonStart + (idx + 1) * PAGE_SIZE - 1, seasonEnd);
+                const start = idx * PAGE_SIZE + 1;
+                const end = Math.min((idx + 1) * PAGE_SIZE, totalCount);
                 const isSelected = activeRange === idx;
 
                 return (

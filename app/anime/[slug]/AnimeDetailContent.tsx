@@ -6,7 +6,7 @@ import { Sparkles, Star } from 'lucide-react';
 import { AnimeHero } from '@/components/anime/AnimeHero';
 import { EpisodeList } from '@/components/anime/EpisodeList';
 import { RelatedRail } from '@/components/anime/RelatedRail';
-import { SeasonSelector, FranchiseSeason } from '@/components/anime/SeasonSelector';
+import { SeasonSelector, type FranchiseSeason } from '@/components/anime/SeasonSelector';
 import type { AnimeDetail } from '@/types';
 
 interface AnimeDetailContentProps {

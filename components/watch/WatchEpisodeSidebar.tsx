@@ -3,18 +3,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Search, ArrowUpDown, Play, ChevronDown } from 'lucide-react';
 import { getAnimeAllEpisodesProgress, EpisodeWatchStatus } from '@/lib/progress';
 import type { AnimeDetail } from '@/types';
-
-interface SeasonInfo {
-  seasonNumber: number;
-  name: string;
-  episodeCount: number;
-  startEpisode: number;
-  endEpisode: number;
-  posterPath: string | null;
-}
+import type { FranchiseSeason } from '@/lib/anilist';
 
 interface WatchEpisodeSidebarProps {
   anilistId: number;
@@ -22,6 +15,7 @@ interface WatchEpisodeSidebarProps {
   totalEpisodes: number;
   anime?: AnimeDetail | null;
   coverImage?: string;
+  seasons?: FranchiseSeason[];
 }
 
 const PAGE_SIZE = 24;
@@ -32,14 +26,14 @@ export function WatchEpisodeSidebar({
   totalEpisodes,
   anime,
   coverImage,
+  seasons = [],
 }: WatchEpisodeSidebarProps) {
+  const router = useRouter();
   const isOnePiece = anilistId === 21 || /one\s*piece/i.test(anime?.title?.english || anime?.title?.romaji || '');
-  const initialTotal = isOnePiece ? 1180 : (totalEpisodes && totalEpisodes > 0 ? totalEpisodes : 24);
+  const totalCount = isOnePiece ? 1180 : (totalEpisodes && totalEpisodes > 0 ? totalEpisodes : 12);
 
-  const [totalCount, setTotalCount] = useState<number>(initialTotal);
-  const [seasons, setSeasons] = useState<SeasonInfo[]>([]);
-  const [activeSeason, setActiveSeason] = useState<number>(0);
-  const [activeRange, setActiveRange] = useState<number>(0);
+  const initialRange = Math.floor((currentEpisode - 1) / PAGE_SIZE);
+  const [activeRange, setActiveRange] = useState<number>(initialRange);
   const [seasonDropdownOpen, setSeasonDropdownOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -69,55 +63,20 @@ export function WatchEpisodeSidebar({
     }
   }, [anilistId]);
 
-  // Fetch season list
+  // Keep active range synced to current episode
   useEffect(() => {
-    let cancelled = false;
-    async function loadSeasons() {
-      if (!animeTitle) return;
-      try {
-        const res = await fetch(
-          `/api/episodes?title=${encodeURIComponent(animeTitle)}&count=${totalCount}&mode=seasons`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (!cancelled && data.seasons && data.seasons.length > 0) {
-            setSeasons(data.seasons);
-            if (data.totalCount && data.totalCount > totalCount) {
-              setTotalCount(data.totalCount);
-            }
-            // Auto-select season containing currentEpisode
-            const seasonIdx = data.seasons.findIndex(
-              (s: SeasonInfo) => currentEpisode >= s.startEpisode && currentEpisode <= s.endEpisode
-            );
-            if (seasonIdx >= 0) {
-              setActiveSeason(seasonIdx);
-              const season = data.seasons[seasonIdx];
-              const epWithinSeason = currentEpisode - season.startEpisode;
-              setActiveRange(Math.floor(epWithinSeason / PAGE_SIZE));
-            }
-          }
-        }
-      } catch {
-        // fallback
-      }
-    }
-    loadSeasons();
-    return () => { cancelled = true; };
-  }, [animeTitle, totalCount, currentEpisode]);
+    setActiveRange(Math.floor((currentEpisode - 1) / PAGE_SIZE));
+  }, [currentEpisode, anilistId]);
 
-  const currentSeason = seasons[activeSeason] || null;
-  const seasonStart = currentSeason?.startEpisode || 1;
-  const seasonEnd = currentSeason?.endEpisode || totalCount;
-  const seasonEpCount = currentSeason?.episodeCount || totalCount;
-  const numSubRanges = Math.ceil(seasonEpCount / PAGE_SIZE);
+  const numSubRanges = Math.ceil(totalCount / PAGE_SIZE);
+  const rangeStart = activeRange * PAGE_SIZE + 1;
+  const rangeEnd = Math.min((activeRange + 1) * PAGE_SIZE, totalCount);
 
   // Fetch episodes for active range
   useEffect(() => {
     let cancelled = false;
     async function loadEpisodes() {
       if (!animeTitle) return;
-      const rangeStart = seasonStart + activeRange * PAGE_SIZE;
-      const rangeEnd = Math.min(seasonStart + (activeRange + 1) * PAGE_SIZE - 1, seasonEnd);
 
       try {
         const res = await fetch(
@@ -125,24 +84,17 @@ export function WatchEpisodeSidebar({
         );
         if (res.ok) {
           const data = await res.json();
-          if (!cancelled) {
-            if (data.totalCount && data.totalCount > totalCount) {
-              setTotalCount(data.totalCount);
-            }
-            if (data.episodes) {
-              setTmdbEpisodes(data.episodes);
-            }
+          if (!cancelled && data.episodes) {
+            setTmdbEpisodes(data.episodes);
           }
         }
       } catch {
         // fallback
       }
     }
-    if (seasons.length > 0) {
-      loadEpisodes();
-    }
+    loadEpisodes();
     return () => { cancelled = true; };
-  }, [animeTitle, activeSeason, activeRange, totalCount, seasons, seasonStart, seasonEnd]);
+  }, [animeTitle, rangeStart, rangeEnd, totalCount]);
 
   // Compute status for an episode
   const getEpStatus = (num: number): EpisodeWatchStatus => {
@@ -162,9 +114,6 @@ export function WatchEpisodeSidebar({
   const episodes = useMemo(() => {
     const list: Array<{ number: number; title: string; thumbnail: string; airDate?: string; status: EpisodeWatchStatus }> = [];
     const banner = anime?.bannerImage || anime?.coverImage?.large || coverImage || 'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx16498.jpg';
-
-    const rangeStart = seasonStart + activeRange * PAGE_SIZE;
-    const rangeEnd = Math.min(seasonStart + (activeRange + 1) * PAGE_SIZE - 1, seasonEnd);
 
     for (let num = rangeStart; num <= rangeEnd; num++) {
       const tmdbEp = tmdbEpisodes.find((e) => e.number === num);
@@ -199,7 +148,9 @@ export function WatchEpisodeSidebar({
     }
 
     return sortAsc ? filtered : [...filtered].reverse();
-  }, [activeSeason, activeRange, seasonStart, seasonEnd, tmdbEpisodes, anime, coverImage, searchQuery, sortAsc, currentEpisode, watchProgressMap]);
+  }, [rangeStart, rangeEnd, tmdbEpisodes, anime, coverImage, searchQuery, sortAsc, currentEpisode, watchProgressMap]);
+
+  const currentFranchiseSeason = seasons.find((s) => s.id === anilistId) || seasons[0] || null;
 
   return (
     <div className="w-full bg-[#111111] border border-white/10 rounded-2xl p-4 flex flex-col h-[650px] lg:h-[750px] shadow-2xl">
@@ -222,7 +173,7 @@ export function WatchEpisodeSidebar({
         </button>
       </div>
 
-      {/* Season Selector */}
+      {/* Franchise Season Selector */}
       {seasons.length > 1 && (
         <div className="relative mb-3">
           <button
@@ -231,37 +182,38 @@ export function WatchEpisodeSidebar({
             className="flex items-center gap-2 bg-[#1a1a1a] border border-white/10 hover:border-[#F47521]/60 rounded-xl px-3 py-2 text-xs font-bold text-white transition-all cursor-pointer w-full shadow-sm"
           >
             <span className="text-[#F47521] text-[10px] font-black uppercase tracking-wider bg-[#F47521]/15 px-1.5 py-0.5 rounded border border-[#F47521]/30">
-              S{currentSeason?.seasonNumber || 1}
+              S{currentFranchiseSeason?.seasonNumber || 1}
             </span>
-            <span className="truncate flex-1 text-left">{currentSeason?.name || 'Season 1'}</span>
-            <span className="text-[10px] text-zinc-500">{currentSeason?.episodeCount || 0} eps</span>
+            <span className="truncate flex-1 text-left">{currentFranchiseSeason?.title || 'Season 1'}</span>
+            <span className="text-[10px] text-zinc-500">{totalCount} eps</span>
             <ChevronDown className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${seasonDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
 
           {seasonDropdownOpen && (
             <div className="absolute top-full mt-1 left-0 right-0 bg-[#161616] border border-white/10 rounded-xl shadow-2xl z-50 max-h-[300px] overflow-y-auto scrollbar-hide py-1 backdrop-blur-xl">
-              {seasons.map((season, idx) => (
+              {seasons.map((season) => (
                 <button
-                  key={season.seasonNumber}
+                  key={season.id}
                   type="button"
                   onClick={() => {
-                    setActiveSeason(idx);
                     setSeasonDropdownOpen(false);
+                    if (season.id !== anilistId) {
+                      router.push(`/watch/${season.id}/1${activeLang === 'dub' ? '?lang=dub' : ''}`);
+                    }
                   }}
                   className={`w-full flex items-center gap-2 px-3 py-2.5 text-left transition-colors hover:bg-white/5 cursor-pointer ${
-                    activeSeason === idx ? 'bg-[#F47521]/10 border-l-2 border-l-[#F47521]' : 'border-l-2 border-l-transparent'
+                    season.id === anilistId ? 'bg-[#F47521]/10 border-l-2 border-l-[#F47521]' : 'border-l-2 border-l-transparent'
                   }`}
                 >
                   <span className={`text-[10px] font-black uppercase tracking-wider w-6 ${
-                    activeSeason === idx ? 'text-[#F47521]' : 'text-zinc-500'
+                    season.id === anilistId ? 'text-[#F47521]' : 'text-zinc-500'
                   }`}>S{season.seasonNumber}</span>
                   <div className="flex-1 min-w-0">
                     <p className={`text-xs font-semibold truncate ${
-                      activeSeason === idx ? 'text-white' : 'text-zinc-300'
-                    }`}>{season.name}</p>
-                    <p className="text-[10px] text-zinc-500">Ep {season.startEpisode}–{season.endEpisode}</p>
+                      season.id === anilistId ? 'text-white' : 'text-zinc-300'
+                    }`}>{season.title}</p>
+                    <p className="text-[10px] text-zinc-500">{season.episodes ? `${season.episodes} episodes` : 'Season'}</p>
                   </div>
-                  <span className="text-[10px] text-zinc-500 shrink-0">{season.episodeCount}</span>
                 </button>
               ))}
             </div>
@@ -273,8 +225,8 @@ export function WatchEpisodeSidebar({
       {numSubRanges > 1 && (
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-2 mb-3 border-b border-white/5">
           {Array.from({ length: numSubRanges }).map((_, idx) => {
-            const start = seasonStart + idx * PAGE_SIZE;
-            const end = Math.min(seasonStart + (idx + 1) * PAGE_SIZE - 1, seasonEnd);
+            const start = idx * PAGE_SIZE + 1;
+            const end = Math.min((idx + 1) * PAGE_SIZE, totalCount);
             const isSelected = activeRange === idx;
 
             return (

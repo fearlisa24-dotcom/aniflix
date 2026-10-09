@@ -329,6 +329,45 @@ export interface FranchiseSeason {
   seasonNumber: number;
   title: string;
   year?: number | null;
+  episodes?: number | null;
+}
+
+export function getNextEpisodeHref(
+  currentId: number,
+  currentEp: number,
+  totalEpisodes: number,
+  seasons: FranchiseSeason[],
+  lang: string = "sub"
+): string | null {
+  const langParam = lang === "dub" ? "?lang=dub" : "";
+  if (currentEp < totalEpisodes) {
+    return `/watch/${currentId}/${currentEp + 1}${langParam}`;
+  }
+  const currentIndex = seasons.findIndex((s) => s.id === currentId);
+  if (currentIndex >= 0 && currentIndex < seasons.length - 1) {
+    const nextSeason = seasons[currentIndex + 1];
+    return `/watch/${nextSeason.id}/1${langParam}`;
+  }
+  return null;
+}
+
+export function getPrevEpisodeHref(
+  currentId: number,
+  currentEp: number,
+  seasons: FranchiseSeason[],
+  lang: string = "sub"
+): string | null {
+  const langParam = lang === "dub" ? "?lang=dub" : "";
+  if (currentEp > 1) {
+    return `/watch/${currentId}/${currentEp - 1}${langParam}`;
+  }
+  const currentIndex = seasons.findIndex((s) => s.id === currentId);
+  if (currentIndex > 0) {
+    const prevSeason = seasons[currentIndex - 1];
+    const prevSeasonEp = prevSeason.episodes || 1;
+    return `/watch/${prevSeason.id}/${prevSeasonEp}${langParam}`;
+  }
+  return null;
 }
 
 export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]> {
@@ -338,6 +377,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
         id
         title { romaji english }
         format
+        episodes
         seasonYear
         relations {
           edges {
@@ -345,6 +385,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
             node {
               id
               format
+              episodes
               seasonYear
               title { romaji english }
               relations {
@@ -353,6 +394,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
                   node {
                     id
                     format
+                    episodes
                     seasonYear
                     title { romaji english }
                   }
@@ -380,6 +422,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
           id: number;
           title: { romaji: string; english: string | null };
           format: string;
+          episodes: number | null;
           seasonYear: number | null;
           relations?: {
             edges: Array<{
@@ -387,6 +430,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
               node: {
                 id: number;
                 format: string;
+                episodes: number | null;
                 seasonYear: number | null;
                 title: { romaji: string; english: string | null };
                 relations?: {
@@ -395,6 +439,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
                     node: {
                       id: number;
                       format: string;
+                      episodes: number | null;
                       seasonYear: number | null;
                       title: { romaji: string; english: string | null };
                     };
@@ -410,12 +455,13 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
     const media = json.data?.Media;
     if (!media) return [];
 
-    const map = new Map<number, { id: number; title: string; year: number | null }>();
+    const map = new Map<number, { id: number; title: string; year: number | null; episodes: number | null }>();
 
     map.set(media.id, {
       id: media.id,
       title: media.title.english || media.title.romaji,
       year: media.seasonYear,
+      episodes: media.episodes,
     });
 
     const edges = media.relations?.edges || [];
@@ -426,6 +472,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
             id: edge.node.id,
             title: edge.node.title.english || edge.node.title.romaji,
             year: edge.node.seasonYear,
+            episodes: edge.node.episodes,
           });
 
           const subEdges = edge.node.relations?.edges || [];
@@ -436,6 +483,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
                   id: sub.node.id,
                   title: sub.node.title.english || sub.node.title.romaji,
                   year: sub.node.seasonYear,
+                  episodes: sub.node.episodes,
                 });
               }
             }
@@ -450,6 +498,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
         seasonNumber: 1,
         title: 'Season 1',
         year: media.seasonYear,
+        episodes: media.episodes,
       }];
     }
 
@@ -465,6 +514,7 @@ export async function getFranchiseSeasons(id: number): Promise<FranchiseSeason[]
       seasonNumber: idx + 1,
       title: `Season ${idx + 1}`,
       year: item.year,
+      episodes: item.episodes,
     }));
   } catch (err) {
     console.error("Failed to get franchise seasons:", err);
